@@ -21,6 +21,8 @@ from preprocess.tacotron.utils import melspectrogram2wav
 from preprocess.tacotron.utils import get_spectrograms
 import librosa 
 
+device_name = 'cuda' if torch.cuda.is_available() else 'cpu'
+
 class Inferencer(object):
     def __init__(self, config, args):
         # config store the value of hyperparameters, turn to attr by AttrDict
@@ -41,7 +43,8 @@ class Inferencer(object):
 
     def load_model(self):
         print(f'Load model from {self.args.model}')
-        self.model.load_state_dict(torch.load(f'{self.args.model}'))
+        self.model.load_state_dict(torch.load(f'{self.args.model}',
+                                              map_location=torch.device(device_name)))
         return
 
     def build_model(self): 
