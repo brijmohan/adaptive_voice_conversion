@@ -25,9 +25,14 @@ def pad_layer(inp, layer, pad_type='reflect'):
     else:
         pad = (kernel_size//2, kernel_size//2)
     # padding
-    inp = F.pad(inp, 
-            pad=pad,
-            mode=pad_type)
+    try:
+        inp = F.pad(inp, 
+                pad=pad,
+                mode=pad_type)
+    except:
+        inp = F.pad(inp, 
+                pad=pad,
+                mode='constant')
     out = layer(inp)
     return out
 
@@ -393,3 +398,7 @@ class AE(nn.Module):
     def get_speaker_embeddings(self, x):
         emb = self.speaker_encoder(x)
         return emb
+
+    def get_content_repr(self, x):
+        mu, log_sigma = self.content_encoder(x)
+        return mu
