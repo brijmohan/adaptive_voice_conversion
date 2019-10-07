@@ -195,7 +195,7 @@ class CorpusConvertor(object):
         # Converting files
         print("Converting files...")
         os.environ["CUDA_VISIBLE_DEVICES"] = "1"
-        Parallel(n_jobs=self.args.ncpu, verbose=30)(
+        Parallel(n_jobs=self.args.ncpu, verbose=30, prefer="threads")(
                 delayed(self.convert_speaker)(spk, uttlist)
                 for spk, uttlist in spk2utt.items())
         return
