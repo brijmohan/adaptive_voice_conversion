@@ -1,3 +1,7 @@
+'''
+Generates TSNE scatter plot for a fixed number of speakers from spk2utt file
+'''
+
 import torch
 import numpy as np
 import sys
@@ -150,7 +154,8 @@ class Inferencer(object):
                 spk_feats = []
                 for u in utts:
                     #print("Utterance:", u, utt2path[u])
-                    utt_feat = self.inference_one_utterance_content(utt2path[u])
+                    #utt_feat = self.inference_one_utterance_content(utt2path[u])
+                    utt_feat = self.inference_one_utterance_spk(utt2path[u])
                     #utt_feat = utt_feat[np.newaxis, :]
                     print(utt_feat.shape)
                     spk_feats.append(utt_feat)

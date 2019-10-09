@@ -1,3 +1,7 @@
+'''
+Transforms Librispeech corpus using predefined strategies
+'''
+
 import torch
 import os 
 import yaml
