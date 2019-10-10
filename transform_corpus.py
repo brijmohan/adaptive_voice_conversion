@@ -157,6 +157,7 @@ class CorpusConvertor(object):
                 with open(tgt_file) as f:
                     tgt_utt = f.read().splitlines()[0]
             else:
+                tgt_spk = random.choice(spklist)
                 tgt_utt = random.choice(spk2utt[tgt_spk])
                 with open(tgt_file, 'w') as f:
                     f.write(tgt_utt+'\n')
@@ -199,7 +200,7 @@ class CorpusConvertor(object):
         # Converting files
         print("Converting files...")
         os.environ["CUDA_VISIBLE_DEVICES"] = "1"
-        Parallel(n_jobs=self.args.ncpu, verbose=30, prefer="threads")(
+        Parallel(n_jobs=self.args.ncpu, verbose=30)(
                 delayed(self.convert_speaker)(spk, uttlist)
                 for spk, uttlist in spk2utt.items())
         return
@@ -212,7 +213,7 @@ if __name__ == '__main__':
     parser.add_argument('-model', '-m', help='model path')
     parser.add_argument('-strategy', '-s', help='Strategy for conversion 1, 2, 3')
     parser.add_argument('-output', '-o', help='Output directory, exact copy of source directories will be created')
-    parser.add_argument('-sample_rate', '-sr', help='sample rate', default=16000, type=int)
+    parser.add_argument('-sample_rate', '-sr', help='sample rate', default=24000, type=int)
     parser.add_argument('-ncpu', '-nj', help='Number of CPUs for parallelization', default=32, type=int)
     parser.add_argument('-resume', '-r', help='Resume conversion from where it was left off', default=0, type=int)
     parser.add_argument('input_paths', type=str, nargs='+', help='Input directories')
