@@ -74,7 +74,7 @@ class CorpusConvertor(object):
 
     def convert_one_utterance(self, x, x_cond):
         x = self.utt_make_frames(x)
-        #x_cond = self.utt_make_frames(x_cond)
+        x_cond = self.utt_make_frames(x_cond)
         dec = self.model.inference(x, x_cond)
         dec = dec.transpose(1, 2).squeeze(0)
         dec = dec.detach().cpu().numpy()
@@ -82,12 +82,14 @@ class CorpusConvertor(object):
         wav_data = melspectrogram2wav(dec)
         return wav_data, dec
 
-    def convert_from_path(self, srcpath, tframes, opath):
+    def convert_from_path(self, srcpath, trgpath, opath, device_id):
+        #print(f"Running on device {device_id}")
+        os.environ["CUDA_VISIBLE_DEVICES"] = str(device_id)
         src_mel, _ = get_spectrograms(srcpath)
-        #tar_mel, _ = get_spectrograms(trgpath)
+        tar_mel, _ = get_spectrograms(trgpath)
         src_mel = torch.from_numpy(self.normalize(src_mel)).cuda()
-        #tar_mel = torch.from_numpy(self.normalize(tar_mel)).cuda()
-        conv_wav, conv_mel = self.convert_one_utterance(src_mel, tframes)
+        tar_mel = torch.from_numpy(self.normalize(tar_mel)).cuda()
+        conv_wav, conv_mel = self.convert_one_utterance(src_mel, tar_mel)
         self.write_wav_to_file(conv_wav, opath)
         return
 
@@ -97,30 +99,6 @@ class CorpusConvertor(object):
         tar_mel_frames = self.utt_make_frames(tar_mel_frames)
         return tar_mel_frames
 
-    def convert_speaker(self, spk, uttlist):
-        #for spk, uttlist in spk2utt.items():
-        output_dir = self.args.output
-        stgy = self.args.strategy
-        for utt in uttlist:
-            sp = utt.split('/')
-            utt_dir = join(output_dir, *sp[-4:-1])
-            os.makedirs(utt_dir, exist_ok=True)
-            utt_opath = join(output_dir, *sp[-4:])
-
-            do_convert = True
-            if self.args.resume == 1:
-                if isfile(utt_opath):
-                    do_convert = False
-
-            if do_convert:
-                if stgy == "1":
-                    self.convert_from_path(utt, self.tgt_map, utt_opath)
-                elif stgy == "2":
-                    self.convert_from_path(utt, self.tgt_map[spk], utt_opath)
-                elif stgy == "3":
-                    self.convert_from_path(utt, self.tgt_map[utt], utt_opath)
-
-        return
 
 
     def main(self):
@@ -129,7 +107,7 @@ class CorpusConvertor(object):
         stgy = self.args.strategy
 
         os.makedirs(output_dir, exist_ok=True)
-        os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+        os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
 
         # Read all audio files with paths
         print("Reading all audio files...")
@@ -143,6 +121,12 @@ class CorpusConvertor(object):
         for fpath in all_inp_files:
             sp = fpath.split('/')
             spk2utt[sp[-3]].append(fpath)
+
+        spk2gpu = {}
+        print(f"Dividing speakers into {self.args.ngpu} GPUs...")
+        for idx, spk in enumerate(spk2utt.keys()):
+            spk2gpu[spk] = idx % self.args.ngpu
+        print(spk2gpu)
 
         print("Total number of speakers:", len(spk2utt))
 
@@ -169,7 +153,8 @@ class CorpusConvertor(object):
                 with open(tgt_file) as f:
                     for line in f.read().splitlines():
                         sp = line.split(' -> ')
-                        tgt_map[sp[0]] = self.get_mel_frames(sp[1])
+                        #tgt_map[sp[0]] = self.get_mel_frames(sp[1])
+                        tgt_map[sp[0]] = sp[1]
             else:
                 tgt_spks = random.sample(spklist, 100)
                 with open(tgt_file, 'w') as f:
@@ -177,7 +162,8 @@ class CorpusConvertor(object):
                         cspk = random.choice(tgt_spks)
                         cutt = random.choice(spk2utt[cspk])
                         f.write(spk + " -> " + cutt + "\n")
-                        tgt_map[spk] = self.get_mel_frames(cutt)
+                        #tgt_map[spk] = self.get_mel_frames(cutt)
+                        tgt_map[spk] = cutt
         elif stgy == "3":
             tgt_map = {}
             if self.args.resume == 1:
@@ -185,7 +171,8 @@ class CorpusConvertor(object):
                 with open(tgt_file) as f:
                     for line in f.read().splitlines():
                         sp = line.split(' -> ')
-                        tgt_map[sp[0]] = self.get_mel_frames(sp[1])
+                        #tgt_map[sp[0]] = self.get_mel_frames(sp[1])
+                        tgt_map[sp[0]] = sp[1]
             else:
                 tgt_spks = random.sample(spklist, 100)
                 with open(tgt_file, 'w') as f:
@@ -194,15 +181,41 @@ class CorpusConvertor(object):
                             cspk = random.choice(tgt_spks)
                             cutt = random.choice(spk2utt[cspk])
                             f.write(utt + " -> " + cutt + "\n")
-                            tgt_map[utt] = self.get_mel_frames(cutt)
+                            #tgt_map[utt] = self.get_mel_frames(cutt)
+                            tgt_map[utt] = cutt
 
         self.tgt_map = tgt_map
         # Converting files
         print("Converting files...")
-        os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+        #os.environ["CUDA_VISIBLE_DEVICES"] = "1"
         Parallel(n_jobs=self.args.ncpu, verbose=30)(
-                delayed(self.convert_speaker)(spk, uttlist)
+                delayed(self.convert_speaker)(spk, uttlist, spk2gpu[spk])
                 for spk, uttlist in spk2utt.items())
+        return
+
+    def convert_speaker(self, spk, uttlist, active_gpu):
+        #for spk, uttlist in spk2utt.items():
+        output_dir = self.args.output
+        stgy = self.args.strategy
+        for utt in uttlist:
+            sp = utt.split('/')
+            utt_dir = join(output_dir, *sp[-4:-1])
+            os.makedirs(utt_dir, exist_ok=True)
+            utt_opath = join(output_dir, *sp[-4:])
+
+            do_convert = True
+            if self.args.resume == 1:
+                if isfile(utt_opath):
+                    do_convert = False
+
+            if do_convert:
+                if stgy == "1":
+                    self.convert_from_path(utt, self.tgt_map, utt_opath, active_gpu)
+                elif stgy == "2":
+                    self.convert_from_path(utt, self.tgt_map[spk], utt_opath, active_gpu)
+                elif stgy == "3":
+                    self.convert_from_path(utt, self.tgt_map[utt], utt_opath, active_gpu)
+
         return
 
 
@@ -214,7 +227,8 @@ if __name__ == '__main__':
     parser.add_argument('-strategy', '-s', help='Strategy for conversion 1, 2, 3')
     parser.add_argument('-output', '-o', help='Output directory, exact copy of source directories will be created')
     parser.add_argument('-sample_rate', '-sr', help='sample rate', default=24000, type=int)
-    parser.add_argument('-ncpu', '-nj', help='Number of CPUs for parallelization', default=32, type=int)
+    parser.add_argument('-ncpu', '-nj', help='Number of jobs per GPU', default=32, type=int)
+    parser.add_argument('-ngpu', '-ng', help='Number of total GPUs', default=2, type=int)
     parser.add_argument('-resume', '-r', help='Resume conversion from where it was left off', default=0, type=int)
     parser.add_argument('input_paths', type=str, nargs='+', help='Input directories')
     args = parser.parse_args()
