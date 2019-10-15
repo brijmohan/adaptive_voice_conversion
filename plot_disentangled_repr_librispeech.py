@@ -154,8 +154,8 @@ class Inferencer(object):
                 spk_feats = []
                 for u in utts:
                     #print("Utterance:", u, utt2path[u])
-                    #utt_feat = self.inference_one_utterance_content(utt2path[u])
-                    utt_feat = self.inference_one_utterance_spk(utt2path[u])
+                    utt_feat = self.inference_one_utterance_content(utt2path[u])
+                    #utt_feat = self.inference_one_utterance_spk(utt2path[u])
                     #utt_feat = utt_feat[np.newaxis, :]
                     print(utt_feat.shape)
                     spk_feats.append(utt_feat)
@@ -213,7 +213,7 @@ if __name__ == '__main__':
     parser.add_argument('-attr', '-a', help='attr file path')
     parser.add_argument('-config', '-c', help='config file path')
     parser.add_argument('-model', '-m', help='model path')
-    parser.add_argument('-source', '-s', help='RSR 2015 root directory')
+    parser.add_argument('-source', '-s', help='source data directory which must contain spk2utt file')
     parser.add_argument('-output', '-o', help='Output image for TSNE plot')
     args = parser.parse_args()
     # load config file 

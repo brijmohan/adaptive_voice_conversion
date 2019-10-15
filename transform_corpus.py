@@ -107,7 +107,6 @@ class CorpusConvertor(object):
         stgy = self.args.strategy
 
         os.makedirs(output_dir, exist_ok=True)
-        os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
 
         # Read all audio files with paths
         print("Reading all audio files...")

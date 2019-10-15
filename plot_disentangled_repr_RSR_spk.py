@@ -25,7 +25,7 @@ from preprocess.tacotron.utils import melspectrogram2wav
 from preprocess.tacotron.utils import get_spectrograms
 import librosa 
 
-from os.path import join
+from os.path import join, isdir
 
 import matplotlib
 matplotlib.use('Agg')
@@ -118,54 +118,48 @@ class Inferencer(object):
         return
 
     def inference_from_path(self):
-        spk2utt = {}
         spk2gender = {}
-        utt2path = {}
         spk2featlen = {}
         X = []
-        mc, fc = 0, 0
-        with open(join(self.args.source, 'wav.scp'), 'r') as wavscp:
-            for line in wavscp.read().splitlines():
-                sp = line.split()
-                utt2path[sp[0]] = sp[5]
-
-        with open(join(self.args.source, 'spk2utt'), 'r') as spkutt:
-            for line in spkutt.read().splitlines():
-                sp = line.split()
-                utts = sp[1:MAX_UTT_PER_SPK+1]
-
-                print("Processing speaker:", sp[0])
-                
-                if sp[0].split('-')[2].startswith('female'):
-                    if fc < MAX_FEMALE:
-                        fc += 1
-                        spk2gender[sp[0]] = 'f'
-                    else:
-                        continue
-                else:
-                    if mc < MAX_MALE:
-                        mc += 1
-                        spk2gender[sp[0]] = 'm'
-                    else:
-                        continue
-
-                spk2utt[sp[0]] = utts
-
-                spk_feats = []
-                for u in utts:
-                    #print("Utterance:", u, utt2path[u])
-                    #utt_feat = self.inference_one_utterance_content(utt2path[u])
-                    utt_feat = self.inference_one_utterance_spk(utt2path[u])
-                    #utt_feat = utt_feat[np.newaxis, :]
-                    print(utt_feat.shape)
-                    spk_feats.append(utt_feat)
-                spk_feats = np.array(spk_feats)
-                spk_feats = spk_feats.squeeze()
-
-                spk2featlen[sp[0]] = spk_feats.shape[0]
-                print(spk_feats.shape)
-                X.append(spk_feats)
         
+        MALE_PATH = join(self.args.source, 'sph', 'male')
+        FEMALE_PATH = join(self.args.source, 'sph', 'female')
+        male_dirs = [mdir for mdir in os.listdir(MALE_PATH) if isdir(join(MALE_PATH, mdir))][:MAX_MALE]
+        female_dirs = [fdir for fdir in os.listdir(FEMALE_PATH) if isdir(join(FEMALE_PATH, fdir))][:MAX_FEMALE]
+
+        for mdir in male_dirs:
+            spk2gender[mdir] = 'm'
+            utts = [join(MALE_PATH, mdir, utt) for utt in os.listdir(join(MALE_PATH, mdir)) if utt.endswith('.sph')][:MAX_UTT_PER_SPK]
+            spk_feats = []
+            for utt in utts:
+                utt_feat = self.inference_one_utterance_spk(utt)
+                print(utt_feat.shape)
+                spk_feats.append(utt_feat)
+
+            spk_feats = np.array(spk_feats)
+            spk_feats = spk_feats.squeeze()
+
+            spk2featlen[mdir] = spk_feats.shape[0]
+            print(spk_feats.shape)
+            X.append(spk_feats)
+
+        for fdir in female_dirs:
+            spk2gender[fdir] = 'f'
+            utts = [join(FEMALE_PATH, fdir, utt) for utt in os.listdir(join(FEMALE_PATH, fdir)) if utt.endswith('.sph')][:MAX_UTT_PER_SPK]
+            spk_feats = []
+            for utt in utts:
+                utt_feat = self.inference_one_utterance_spk(utt)
+                print(utt_feat.shape)
+                spk_feats.append(utt_feat)
+
+            spk_feats = np.array(spk_feats)
+            spk_feats = spk_feats.squeeze()
+
+            spk2featlen[fdir] = spk_feats.shape[0]
+            print(spk_feats.shape)
+            X.append(spk_feats)
+
+
         nspk = len(spk2gender.keys())
         print("Number of speakers", nspk)
 
@@ -213,7 +207,7 @@ if __name__ == '__main__':
     parser.add_argument('-attr', '-a', help='attr file path')
     parser.add_argument('-config', '-c', help='config file path')
     parser.add_argument('-model', '-m', help='model path')
-    parser.add_argument('-source', '-s', help='source data directory which must contain spk2utt file')
+    parser.add_argument('-source', '-s', help='RSR 2015 root directory')
     parser.add_argument('-output', '-o', help='Output image for TSNE plot')
     args = parser.parse_args()
     # load config file 
