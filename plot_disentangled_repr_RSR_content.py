@@ -174,6 +174,7 @@ class Inferencer(object):
         std_X = np.std(X, axis=0)
 
         X = (X - mean_X) / std_X
+        X = X / np.linalg.norm(X, axis=1)[:, np.newaxis]
         print("silhoutte X ", silhouette_score(X, labels))
 
         Y = TSNE(perplexity=30).fit_transform(X)
