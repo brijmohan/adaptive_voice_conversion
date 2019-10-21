@@ -102,6 +102,7 @@ class CorpusConvertor(object):
 
 
     def main(self):
+        all_spk_paths = ["/home/bsrivastava/asr_data/LibriSpeech/test-clean", "/home/bsrivastava/asr_data/LibriSpeech/train-clean-100", "/home/bsrivastava/asr_data/LibriSpeech/train-clean-360"]
         input_paths = self.args.input_paths
         output_dir = self.args.output
         stgy = self.args.strategy
@@ -110,16 +111,29 @@ class CorpusConvertor(object):
 
         # Read all audio files with paths
         print("Reading all audio files...")
+        all_spk_files = []
+        for p in all_spk_paths:
+            all_spk_files.extend(glob.glob(join(p, '*/*/*.flac')))
+
+        # Read all audio files which needs to be converted
+        print("Reading input audio files...")
         all_inp_files = []
         for p in input_paths:
             all_inp_files.extend(glob.glob(join(p, '*/*/*.flac')))
 
         # Create speaker mapping from path
-        print("Creating speaker mapping from path...")
+        print("Creating speaker mapping from all path...")
         spk2utt = defaultdict(lambda: [])
-        for fpath in all_inp_files:
+        for fpath in all_spk_files:
             sp = fpath.split('/')
             spk2utt[sp[-3]].append(fpath)
+
+        # Create speaker mapping from path
+        print("Creating speaker mapping from input path...")
+        spk2utt_inp = defaultdict(lambda: [])
+        for fpath in all_inp_files:
+            sp = fpath.split('/')
+            spk2utt_inp[sp[-3]].append(fpath)
 
         spk2gpu = {}
         print(f"Dividing speakers into {self.args.ngpu} GPUs...")
@@ -144,7 +158,8 @@ class CorpusConvertor(object):
                 tgt_utt = random.choice(spk2utt[tgt_spk])
                 with open(tgt_file, 'w') as f:
                     f.write(tgt_utt+'\n')
-            tgt_map = self.get_mel_frames(tgt_utt)
+            #tgt_map = self.get_mel_frames(tgt_utt)
+            tgt_map = tgt_utt
         elif stgy == "2":
             tgt_map = {}
             if self.args.resume == 1:
@@ -189,7 +204,7 @@ class CorpusConvertor(object):
         #os.environ["CUDA_VISIBLE_DEVICES"] = "1"
         Parallel(n_jobs=self.args.ncpu, verbose=30)(
                 delayed(self.convert_speaker)(spk, uttlist, spk2gpu[spk])
-                for spk, uttlist in spk2utt.items())
+                for spk, uttlist in spk2utt_inp.items())
         return
 
     def convert_speaker(self, spk, uttlist, active_gpu):
