@@ -21,7 +21,8 @@ from preprocess.tacotron.utils import melspectrogram2wav
 from preprocess.tacotron.utils import get_spectrograms
 import librosa 
 
-device_name = 'cuda' if torch.cuda.is_available() else 'cpu'
+is_cuda = torch.cuda.is_available()
+device_name = 'cuda' if is_cuda else 'cpu'
 
 class Inferencer(object):
     def __init__(self, config, args):
@@ -89,8 +90,12 @@ class Inferencer(object):
     def inference_from_path(self):
         src_mel, _ = get_spectrograms(self.args.source)
         tar_mel, _ = get_spectrograms(self.args.target)
-        src_mel = torch.from_numpy(self.normalize(src_mel)).cuda()
-        tar_mel = torch.from_numpy(self.normalize(tar_mel)).cuda()
+        src_mel = torch.from_numpy(self.normalize(src_mel))
+        if is_cuda:
+          src_mel = src_mel.cuda()
+        tar_mel = torch.from_numpy(self.normalize(tar_mel))
+        if is_cuda:
+          tar_mel = tar_mel.cuda()
         conv_wav, conv_mel = self.inference_one_utterance(src_mel, tar_mel)
         self.write_wav_to_file(conv_wav, self.args.output)
         return
